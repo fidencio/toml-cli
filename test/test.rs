@@ -106,47 +106,124 @@ tomltest_get_err_empty!(get_missing_num, ["key[1]"]);
 macro_rules! tomltest_set {
     ($name:ident, $name_w:ident, $args:expr, $expected:expr) => {
         tomltest!($name, |mut t: TestCaseState| {
-            t.write_file(INITIAL);
+            t.write_file(&("\n".to_owned() + INITIAL + "\n"));
             t.cmd.args(["set", &t.filename()]).args($args);
-            check_eq(&$expected, &t.expect_success());
+            check_eq(&format!($expected), &t.expect_success());
         });
         tomltest!($name_w, |mut t: TestCaseState| {
-            t.write_file(INITIAL);
+            t.write_file(&("\n".to_owned() + INITIAL + "\n"));
             t.cmd.args(["set", "-w", &t.filename()]).args($args);
             check_eq("", &t.expect_success());
-            check_eq(&$expected, &t.read_file());
+            check_eq(&format!($expected), &t.read_file());
         });
     };
 }
 
-const INITIAL: &str = r#"
+const INITIAL: &str = "[x]\ny = 1";
+
+tomltest_set!(
+    set_auto_string_replace_existing,
+    set_auto_string_replace_existing_and_write,
+    ["x.y", "update"],
+    r#"
 [x]
-y = 1
-"#;
+y = "update"
+"#
+);
 
-#[rustfmt::skip]
-tomltest_set!(set_string_existing, set_string_existing_and_write, ["x.y", "new"], r#"
-[x]
-y = "new"
-"#);
+tomltest_set!(
+    set_auto_string_extend_existing,
+    set_auto_string_extend_existing_and_write,
+    ["x.z", "new"],
+    r#"
+{INITIAL}
+z = "new"
+"#
+);
 
-#[rustfmt::skip]
-tomltest_set!(set_string_existing_table, set_string_existing_table_and_write, ["x.z", "123"], 
-format!(
-r#"{INITIAL}z = "123"
-"#));
+tomltest_set!(
+    set_auto_string_new_table,
+    set_auto_string_new_table_and_write,
+    ["foo.bar", "baz"],
+    r#"
+{INITIAL}
 
-#[rustfmt::skip]
-tomltest_set!(set_string_new_table, set_string_new_table_and_write, ["foo.bar", "baz"], format!(
-r#"{INITIAL}
 [foo]
 bar = "baz"
-"#));
+"#
+);
 
-#[rustfmt::skip]
-tomltest_set!(set_string_toplevel, set_string_toplevel_and_write, ["foo", "bar"], format!(
-r#"foo = "bar"
-{INITIAL}"#));
+tomltest_set!(
+    set_auto_string_new_toplevel,
+    set_auto_string_new_toplevel_and_write,
+    ["foo", "bar"],
+    r#"foo = "bar"
+
+{INITIAL}
+"#
+);
+
+tomltest_set!(
+    set_auto_bool_replace_existing,
+    set_auto_bool_replace_existing_and_write,
+    ["x.y", "true"],
+    r#"
+[x]
+y = true
+"#
+);
+
+tomltest_set!(
+    set_auto_string_array_replace_existing,
+    set_auto_string_array_replace_existing_and_write,
+    ["x.y", r#"["a", "b"]"#],
+    r#"
+[x]
+y = ["a", "b"]
+"#
+);
+
+tomltest_set!(
+    set_require_string_for_intlike_value,
+    set_require_string_for_intlike_value_and_write,
+    ["x.y", "2", "--type", "string"],
+    r#"
+[x]
+y = "2"
+"#
+);
+
+tomltest_set!(
+    set_auto_string_with_quoted_string,
+    set_auto_string_with_quoted_string_and_write,
+    ["x.y", r#""update""#],
+    r#"
+[x]
+y = "\"update\""
+"#
+);
+
+macro_rules! tomltest_set_err {
+    ($name:ident, $args:expr, $pattern:expr) => {
+        tomltest!($name, |mut t: TestCaseState| {
+            t.write_file(&("\n".to_owned() + INITIAL + "\n"));
+            t.cmd.args(["set", &t.filename()]).args($args);
+            check_contains($pattern, &t.expect_error());
+        });
+    };
+}
+
+tomltest_set_err!(
+    set_require_int_got_string,
+    ["x.y", "foo", "--type", "int"],
+    "toml: value type does not match required type"
+);
+
+tomltest_set_err!(
+    set_require_bool_got_int,
+    ["x.y", "2", "--type", "boolean"],
+    "toml: value type does not match required type"
+);
 
 // TODO test `set` on string with newlines and other fun characters
 // TODO test `set` when existing value is an array, table, or array of tables
