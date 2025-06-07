@@ -8,7 +8,7 @@ use anyhow::Error;
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use structopt::StructOpt;
 use thiserror::Error;
-use toml_edit::{value, Document, Item, Table, Value};
+use toml_edit::{value, DocumentMut, Item, Table, Value};
 
 use query_parser::{parse_query, Query, TpathSegment};
 
@@ -126,11 +126,11 @@ fn main() {
     })
 }
 
-fn read_parse(path: &PathBuf) -> Result<Document, Error> {
+fn read_parse(path: &PathBuf) -> Result<DocumentMut, Error> {
     // TODO: better report errors like ENOENT
     let data = fs::read(path)?;
     let data = str::from_utf8(&data)?;
-    Ok(data.parse::<Document>()?)
+    Ok(data.parse::<DocumentMut>()?)
 }
 
 fn get(path: &PathBuf, query: &str, opts: &GetOpts) -> Result<(), Error> {
@@ -156,7 +156,7 @@ fn get(path: &PathBuf, query: &str, opts: &GetOpts) -> Result<(), Error> {
     Ok(())
 }
 
-fn print_toml_fragment(doc: &Document, tpath: &[TpathSegment]) {
+fn print_toml_fragment(doc: &DocumentMut, tpath: &[TpathSegment]) {
     use TpathSegment::{Name, Num};
 
     let mut item = doc.as_item();
@@ -197,7 +197,7 @@ fn print_toml_fragment(doc: &Document, tpath: &[TpathSegment]) {
             _ => panic!("UNIMPLEMENTED: --output-toml inside inline data"), // TODO
         }
     }
-    let doc = Document::from(item.into_table().unwrap());
+    let doc = DocumentMut::from(item.into_table().unwrap());
     print!("{}", doc);
 }
 
